@@ -1,0 +1,71 @@
+apply plugin: 'java'
+apply plugin: 'thrift'
+apply plugin: 'idea'
+
+sourceCompatibility = 1.7
+version = '1.0'
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "co.tomlee.gradle.plugins:gradle-thrift-plugin:0.0.4"
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+configurations {
+    quasar
+}
+
+dependencies {
+    compile "org.apache.thrift:libthrift:0.9.1"
+    compile "co.paralleluniverse:quasar-core:0.6.0"
+    compile "com.pinterest:quasar-thrift:1.0"
+    compile "org.slf4j:slf4j-api:1.7.7"
+    compile "org.slf4j:slf4j-simple:1.7.7"
+
+    quasar "co.paralleluniverse:quasar-core:0.6.0"
+}
+
+generateThriftSource {
+    generators { java {} }
+}
+
+task runServer(type: JavaExec) {
+    main = "com.pinterest.echo.server.Main"
+    classpath = sourceSets.main.runtimeClasspath
+    jvmArgs "-javaagent:${configurations.quasar.iterator().next()}"
+    //systemProperties "co.paralleluniverse.fibers.verifyInstrumentation": "true"
+}
+
+task runClient(type: JavaExec) {
+    main = "com.pinterest.echo.client.Main"
+    classpath = sourceSets.main.runtimeClasspath
+    jvmArgs "-javaagent:${configurations.quasar.iterator().next()}"
+    //systemProperties "co.paralleluniverse.fibers.verifyInstrumentation": "true"
+}
+
+classes {
+    doFirst {
+        ant.taskdef(name: 'scanSuspendables',
+                classname: 'co.paralleluniverse.fibers.instrument.SuspendablesScanner',
+                classpath: "build/classes/main:build/resources/main:${configurations.runtime.asPath}")
+        ant.scanSuspendables(
+                auto: true,
+                suspendablesFile: "$sourceSets.main.output.resourcesDir/META-INF/suspendables",
+                supersFile: "$sourceSets.main.output.resourcesDir/META-INF/suspendable-supers",
+                append: true) {
+            fileset(dir: sourceSets.main.output.classesDir)
+        }
+    }
+}
+
+idea.module.excludeDirs = []
+idea.module.sourceDirs += file("build/generated-src/thrift/main")

@@ -1,0 +1,3 @@
+com.pinterest.echo.thrift.EchoService$Client.send_echo
+com.pinterest.echo.thrift.EchoService$Client.echo
+com.pinterest.echo.thrift.EchoService$Client.recv_echo

@@ -1,0 +1,29 @@
+apply plugin: 'java'
+apply plugin: 'maven'
+
+sourceCompatibility = 1.7
+version = '1.0'
+group = 'com.pinterest'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile group: 'co.paralleluniverse', name: 'quasar-core', version: '0.6.0'
+    compile group: 'org.apache.thrift', name: 'libthrift', version: '0.9.1'
+}
+
+classes {
+    doFirst {
+        ant.taskdef(name: 'scanSuspendables',
+                    classname: 'co.paralleluniverse.fibers.instrument.SuspendablesScanner',
+                    classpath: "build/classes/main:build/resources/main:${configurations.runtime.asPath}")
+        ant.scanSuspendables(auto: true,
+                             suspendablesFile: "$sourceSets.main.output.resourcesDir/META-INF/suspendables",
+                             supersFile: "$sourceSets.main.output.resourcesDir/META-INF/suspendable-supers",
+                             append: true) {
+            fileset(dir: sourceSets.main.output.classesDir)
+        }
+    }
+}

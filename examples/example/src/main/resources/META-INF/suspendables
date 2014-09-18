@@ -1,0 +1,3 @@
+com.pinterest.example.thrift.ExampleService$Client.send_example
+com.pinterest.example.thrift.ExampleService$Client.example
+com.pinterest.example.thrift.ExampleService$Client.recv_example
