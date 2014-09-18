@@ -144,6 +144,7 @@ public class TFiberServer extends TServer {
   @Override
   @Suspendable
   public void stop() {
+    stopped = true;
     serverFiber.interrupt();
   }
 
