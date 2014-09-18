@@ -5,7 +5,7 @@ Quasar Thrift
 threads for the JVM (see references below for links to more information).
 [Thrift](https://thrift.apache.org) is a code generator for services that works across multiple
 languages. This package integrates Quasar with Thrift, providing a high-performance Thrift server
-that makes it possible to take advantage of Quasar's elegant programming model.
+that takes advantage of Quasar's elegant programming model.
 
 ## Getting Started
 
