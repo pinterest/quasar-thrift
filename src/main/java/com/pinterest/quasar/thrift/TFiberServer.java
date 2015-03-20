@@ -51,7 +51,7 @@ import java.util.concurrent.ExecutionException;
  *
  * Here is an example of a main method for a TFiberServer:
  *
- * <pre>
+ * <code>
  *   public static void main(String[] args) {
  *     int port = 9999;
  *     YourService.Processor processor = new YourService.Processor();
@@ -60,7 +60,7 @@ import java.util.concurrent.ExecutionException;
  *     server.serve();
  *
  *     Runtime.addShutdownHook(new Thread() {
- *       @Override
+ *       {@literal @}Override
  *       public void run() {
  *         server.stop();
  *         server.join();
@@ -69,7 +69,7 @@ import java.util.concurrent.ExecutionException;
  *
  *     server.join();
  *   }
- * </pre>
+ * </code>
  *
  * The call to {@link java.lang.Runtime#addShutdownHook(Thread)} is optional, but makes it possible
  * to gracefully shutdown the server by stopping the JVM (typically by sending a SIGINT to the JVM).
@@ -115,7 +115,8 @@ public class TFiberServer extends TServer {
   /**
    * Constructor.
    *
-   * @param args
+   * @param args server arguments, passed to super class, these are only used
+   *             for the transport and processor.
    */
   public TFiberServer(AbstractServerArgs<Args> args) {
     super(args);

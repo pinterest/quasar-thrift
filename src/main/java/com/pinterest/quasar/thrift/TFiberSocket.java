@@ -106,7 +106,7 @@ public class TFiberSocket extends TTransport {
    * @param bytes the bytes to be written to the underlying socket.
    * @param offset the offset at which to start reading from bytes.
    * @param limit the number of bytes to read from bytes and write to the underlying socket.
-   * @throws TTransportException
+   * @throws TTransportException if an error occurs while writing
    */
   @Override
   @Suspendable
