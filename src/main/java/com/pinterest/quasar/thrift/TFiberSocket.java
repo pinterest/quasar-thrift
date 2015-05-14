@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousChannelGroup;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -48,6 +49,16 @@ public class TFiberSocket extends TTransport {
   public static TFiberSocket open(SocketAddress addr, long timeout, TimeUnit unit)
       throws IOException, SuspendExecution {
     return new TFiberSocket(FiberSocketChannel.open(addr), timeout, unit);
+  }
+
+  public static TFiberSocket open(SocketAddress addr, AsynchronousChannelGroup group)
+      throws IOException, SuspendExecution {
+    return new TFiberSocket(FiberSocketChannel.open(group, addr), -1, TimeUnit.SECONDS);
+  }
+
+  public static TFiberSocket open(SocketAddress addr, AsynchronousChannelGroup group, long timeout, TimeUnit unit)
+      throws IOException, SuspendExecution {
+    return new TFiberSocket(FiberSocketChannel.open(group, addr), timeout, unit);
   }
 
   /**
