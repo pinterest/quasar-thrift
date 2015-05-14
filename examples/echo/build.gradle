@@ -2,7 +2,8 @@ apply plugin: 'java'
 apply plugin: 'thrift'
 apply plugin: 'idea'
 
-sourceCompatibility = 1.7
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 version = '1.0'
 
 buildscript {
@@ -27,7 +28,7 @@ configurations {
 dependencies {
     compile "org.apache.thrift:libthrift:0.9.1"
     compile "co.paralleluniverse:quasar-core:0.6.0"
-    compile "com.pinterest:quasar-thrift:1.0"
+    compile "com.pinterest:quasar-thrift:0.1-SNAPSHOT"
     compile "org.slf4j:slf4j-api:1.7.7"
     compile "org.slf4j:slf4j-simple:1.7.7"
 

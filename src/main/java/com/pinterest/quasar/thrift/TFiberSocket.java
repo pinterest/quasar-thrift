@@ -24,24 +24,30 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A Thrift socket that uses Fiber-blocking network calls.
  *
- * This class is thread-safe.
+ * This class is thread-safe. TODO(charles): clarify this!
  */
 public class TFiberSocket extends TTransport {
-  TFiberSocket(FiberSocketChannel socketChannelArg) {
-    socketChannel = socketChannelArg;
+  TFiberSocket(FiberSocketChannel fsc, long timeout, TimeUnit timeoutUnit) {
+    socketChannel = fsc;
+    this.timeout = timeout;
+    this.timeoutUnit = timeoutUnit;
   }
 
+  // Quasar cannot instrument constructors, so these need to be static methods.
   public static TFiberSocket open(SocketAddress addr) throws IOException, SuspendExecution {
-    FiberSocketChannel fsc = FiberSocketChannel.open(addr);
-    return new TFiberSocket(fsc);
+    return new TFiberSocket(FiberSocketChannel.open(addr), -1, TimeUnit.SECONDS);
+  }
+
+  public static TFiberSocket open(SocketAddress addr, long timeout, TimeUnit unit)
+      throws IOException, SuspendExecution {
+    return new TFiberSocket(FiberSocketChannel.open(addr), timeout, unit);
   }
 
   /**
@@ -78,7 +84,7 @@ public class TFiberSocket extends TTransport {
    *
    * @param bytes must be at least offset + bytes in size.
    * @param offset the offset at which to start writing into bytes.
-   * @param limit the maximum number of bytes to read into bytes.
+   * @param limit the maximum number of bytes to write into bytes.
    * @return the number of bytes actually read from the underlying socket.
    * @throws TTransportException if an error occurred while reading.
    */
@@ -89,9 +95,11 @@ public class TFiberSocket extends TTransport {
 
     int bytesRead;
     try {
-      bytesRead = socketChannel.read(buf);
+      bytesRead = socketChannel.read(buf, timeout, timeoutUnit);
     } catch (IOException ioex) {
       throw new TTransportException(TTransportException.UNKNOWN, ioex);
+    } catch (SuspendExecution ex) {
+      throw new TTransportException(TTransportException.UNKNOWN, ex);
     }
 
     if (bytesRead < 0) {
@@ -102,7 +110,8 @@ public class TFiberSocket extends TTransport {
   }
 
   /**
-   * Writes up to limit bytes starting at offset from the bytes array into the underlying socket.
+   * Writes limit bytes starting at offset from the bytes array into the underlying socket.
+   *
    * @param bytes the bytes to be written to the underlying socket.
    * @param offset the offset at which to start reading from bytes.
    * @param limit the number of bytes to read from bytes and write to the underlying socket.
@@ -113,13 +122,17 @@ public class TFiberSocket extends TTransport {
   public void write(byte[] bytes, int offset, int limit) throws TTransportException {
     ByteBuffer buf = ByteBuffer.wrap(bytes, offset, limit);
     try {
-      socketChannel.write(buf);
+      socketChannel.write(buf, timeout, timeoutUnit);
     } catch (IOException ioex) {
       throw new TTransportException(TTransportException.UNKNOWN, ioex);
+    } catch (SuspendExecution ex) {
+      throw new TTransportException(TTransportException.UNKNOWN, ex);
     }
   }
 
   private final FiberSocketChannel socketChannel;
+  private final long timeout;
+  private final TimeUnit timeoutUnit;
 
   private static final Logger LOG = LoggerFactory.getLogger(TFiberSocket.class);
 }
