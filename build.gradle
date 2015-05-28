@@ -2,8 +2,8 @@ apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'signing'
 
-sourceCompatibility = '1.7'
-targetCompatibility = '1.7'
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
 
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 
@@ -26,11 +26,12 @@ if (!project.hasProperty("sonatypeUsername") || !project.hasProperty("sonatypePa
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
 }
 
 dependencies {
-    compile group: 'co.paralleluniverse', name: 'quasar-core', version: '0.6.0'
+    compile group: 'co.paralleluniverse', name: 'quasar-core', version: '0.6.3-SNAPSHOT'
     compile group: 'org.apache.thrift', name: 'libthrift', version: '0.9.1'
 }
 

@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
-import java.util.concurrent.TimeUnit;
 
 /**
  * A server transport that uses Fiber-blocking network calls.
@@ -61,6 +60,8 @@ public class TFiberServerSocket extends TServerTransport {
       serverSocketChannel = FiberServerSocketChannel.open()
           .setOption(StandardSocketOptions.SO_REUSEADDR, true)
           .bind(addr);
+    } catch (SuspendExecution se) {
+      throw new AssertionError(se);
     } catch (IOException ioex) {
       throw new TTransportException(TTransportException.UNKNOWN, ioex);
     }
@@ -86,7 +87,7 @@ public class TFiberServerSocket extends TServerTransport {
   protected TTransport acceptImpl() throws TTransportException {
     try {
       FiberSocketChannel socketChannel = serverSocketChannel.accept();
-      return new TFiberSocket(socketChannel, -1, TimeUnit.SECONDS);
+      return new TFiberSocket(socketChannel);
     } catch (SuspendExecution ex) {
       throw new AssertionError("Instrumentation should have removed this code");
     } catch (IOException ioex) {
