@@ -61,6 +61,8 @@ public class TFiberServerSocket extends TServerTransport {
       serverSocketChannel = FiberServerSocketChannel.open()
           .setOption(StandardSocketOptions.SO_REUSEADDR, true)
           .bind(addr);
+    } catch (SuspendExecution se) {
+      throw new AssertionError(se);
     } catch (IOException ioex) {
       throw new TTransportException(TTransportException.UNKNOWN, ioex);
     }

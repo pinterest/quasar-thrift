@@ -17,6 +17,7 @@ package com.pinterest.quasar.thrift;
 
 import co.paralleluniverse.fibers.SuspendExecution;
 import co.paralleluniverse.fibers.Suspendable;
+import co.paralleluniverse.fibers.io.ChannelGroup;
 import co.paralleluniverse.fibers.io.FiberSocketChannel;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
@@ -26,7 +27,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousChannelGroup;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -53,12 +53,12 @@ public class TFiberSocket extends TTransport {
     return new TFiberSocket(FiberSocketChannel.open(addr), timeout, unit);
   }
 
-  public static TFiberSocket open(SocketAddress addr, AsynchronousChannelGroup group)
+  public static TFiberSocket open(SocketAddress addr, ChannelGroup group)
       throws IOException, SuspendExecution {
     return new TFiberSocket(FiberSocketChannel.open(group, addr), -1, TimeUnit.SECONDS);
   }
 
-  public static TFiberSocket open(SocketAddress addr, AsynchronousChannelGroup group, long timeout, TimeUnit unit)
+  public static TFiberSocket open(SocketAddress addr, ChannelGroup group, long timeout, TimeUnit unit)
       throws IOException, SuspendExecution {
     return new TFiberSocket(FiberSocketChannel.open(group, addr), timeout, unit);
   }
@@ -97,7 +97,7 @@ public class TFiberSocket extends TTransport {
    *
    * @param bytes must be at least offset + bytes in size.
    * @param offset the offset at which to start writing into bytes.
-   * @param limit the maximum number of bytes to write into bytes.
+   * @param limit the maximum number of bytes to read into bytes.
    * @return the number of bytes actually read from the underlying socket.
    * @throws TTransportException if an error occurred while reading.
    */
