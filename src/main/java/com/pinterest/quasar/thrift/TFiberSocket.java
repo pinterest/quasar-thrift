@@ -25,9 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 
 /**
@@ -49,7 +47,6 @@ public class TFiberSocket extends TTransport {
     FiberSocketChannel fsc = FiberSocketChannel.open(group, addr);
     return new TFiberSocket(fsc);
   }
-
 
   /**
    * Checks that the underlying network connection is open.
