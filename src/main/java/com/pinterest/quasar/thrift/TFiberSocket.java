@@ -36,6 +36,8 @@ import java.util.concurrent.TimeUnit;
  */
 public class TFiberSocket extends TTransport {
   TFiberSocket(FiberSocketChannel fsc, long timeout, TimeUnit timeoutUnit) {
+    curWriteBuffer = 0;
+    writeBuffers = new ByteBuffer[2];
     socketChannel = fsc;
     this.timeout = timeout;
     this.timeoutUnit = timeoutUnit;
@@ -107,17 +109,15 @@ public class TFiberSocket extends TTransport {
     int bytesRead;
     try {
       bytesRead = socketChannel.read(buf, timeout, timeoutUnit);
+      if (bytesRead < 0) {
+        throw new TTransportException(TTransportException.END_OF_FILE);
+      }
+      return bytesRead;
     } catch (IOException ioex) {
       throw new TTransportException(TTransportException.UNKNOWN, ioex);
     } catch (SuspendExecution ex) {
       throw new TTransportException(TTransportException.UNKNOWN, ex);
     }
-
-    if (bytesRead < 0) {
-      throw new TTransportException(TTransportException.END_OF_FILE);
-    }
-
-    return bytesRead;
   }
 
   /**
@@ -131,16 +131,39 @@ public class TFiberSocket extends TTransport {
   @Override
   @Suspendable
   public void write(byte[] bytes, int offset, int limit) throws TTransportException {
-    ByteBuffer buf = ByteBuffer.wrap(bytes, offset, limit);
+    if (curWriteBuffer == 2) {
+      throw new RuntimeException("Attempted to write more than two buffers to TSocket, make sure " +
+          "you are using TFastFramedTransport or TFramedTransport");
+    }
+
+    writeBuffers[curWriteBuffer] = ByteBuffer.wrap(bytes, offset, limit);
+    curWriteBuffer++;
+  }
+
+  @Override
+  @Suspendable
+  public void flush() throws TTransportException {
+    if (curWriteBuffer < 2) {
+      throw new RuntimeException("Attempted to flush with less than two buffers, make sure you " +
+          "are using TFastFramedTransport or TFramedTransport");
+    }
+
+    curWriteBuffer = 0;
+
     try {
-      socketChannel.write(buf, timeout, timeoutUnit);
+      while (writeBuffers[1].hasRemaining()) {
+        long bytesWritten = socketChannel.write(writeBuffers);
+        if (bytesWritten < 0) {
+          throw new TTransportException(TTransportException.END_OF_FILE);
+        }
+      }
     } catch (IOException ioex) {
       throw new TTransportException(TTransportException.UNKNOWN, ioex);
-    } catch (SuspendExecution ex) {
-      throw new TTransportException(TTransportException.UNKNOWN, ex);
     }
   }
 
+  private int curWriteBuffer;
+  private final ByteBuffer[] writeBuffers;
   private final FiberSocketChannel socketChannel;
   private final long timeout;
   private final TimeUnit timeoutUnit;
