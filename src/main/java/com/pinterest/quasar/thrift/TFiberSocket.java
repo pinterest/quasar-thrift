@@ -27,25 +27,40 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A Thrift socket that uses Fiber-blocking network calls.
  *
- * This class is thread-safe.
+ * This class is thread-safe. TODO(charles): clarify this!
  */
 public class TFiberSocket extends TTransport {
-  TFiberSocket(FiberSocketChannel socketChannelArg) {
-    socketChannel = socketChannelArg;
+  TFiberSocket(FiberSocketChannel fsc, long timeout, TimeUnit timeoutUnit) {
+    curWriteBuffer = 0;
+    writeBuffers = new ByteBuffer[2];
+    socketChannel = fsc;
+    this.timeout = timeout;
+    this.timeoutUnit = timeoutUnit;
   }
 
+  // Quasar cannot instrument constructors, so these need to be static methods.
   public static TFiberSocket open(SocketAddress addr) throws IOException, SuspendExecution {
-    FiberSocketChannel fsc = FiberSocketChannel.open(addr);
-    return new TFiberSocket(fsc);
+    return new TFiberSocket(FiberSocketChannel.open(addr), -1, TimeUnit.SECONDS);
   }
 
-  public static TFiberSocket open(ChannelGroup group, SocketAddress addr) throws IOException, SuspendExecution {
-    FiberSocketChannel fsc = FiberSocketChannel.open(group, addr);
-    return new TFiberSocket(fsc);
+  public static TFiberSocket open(SocketAddress addr, long timeout, TimeUnit unit)
+      throws IOException, SuspendExecution {
+    return new TFiberSocket(FiberSocketChannel.open(addr), timeout, unit);
+  }
+
+  public static TFiberSocket open(SocketAddress addr, ChannelGroup group)
+      throws IOException, SuspendExecution {
+    return new TFiberSocket(FiberSocketChannel.open(group, addr), -1, TimeUnit.SECONDS);
+  }
+
+  public static TFiberSocket open(SocketAddress addr, ChannelGroup group, long timeout, TimeUnit unit)
+      throws IOException, SuspendExecution {
+    return new TFiberSocket(FiberSocketChannel.open(group, addr), timeout, unit);
   }
 
   /**
@@ -93,20 +108,21 @@ public class TFiberSocket extends TTransport {
 
     int bytesRead;
     try {
-      bytesRead = socketChannel.read(buf);
+      bytesRead = socketChannel.read(buf, timeout, timeoutUnit);
+      if (bytesRead < 0) {
+        throw new TTransportException(TTransportException.END_OF_FILE);
+      }
+      return bytesRead;
     } catch (IOException ioex) {
       throw new TTransportException(TTransportException.UNKNOWN, ioex);
+    } catch (SuspendExecution ex) {
+      throw new TTransportException(TTransportException.UNKNOWN, ex);
     }
-
-    if (bytesRead < 0) {
-      throw new TTransportException(TTransportException.END_OF_FILE);
-    }
-
-    return bytesRead;
   }
 
   /**
-   * Writes up to limit bytes starting at offset from the bytes array into the underlying socket.
+   * Writes limit bytes starting at offset from the bytes array into the underlying socket.
+   *
    * @param bytes the bytes to be written to the underlying socket.
    * @param offset the offset at which to start reading from bytes.
    * @param limit the number of bytes to read from bytes and write to the underlying socket.
@@ -115,15 +131,42 @@ public class TFiberSocket extends TTransport {
   @Override
   @Suspendable
   public void write(byte[] bytes, int offset, int limit) throws TTransportException {
-    ByteBuffer buf = ByteBuffer.wrap(bytes, offset, limit);
+    if (curWriteBuffer == 2) {
+      throw new RuntimeException("Attempted to write more than two buffers to TSocket, make sure " +
+          "you are using TFastFramedTransport or TFramedTransport");
+    }
+
+    writeBuffers[curWriteBuffer] = ByteBuffer.wrap(bytes, offset, limit);
+    curWriteBuffer++;
+  }
+
+  @Override
+  @Suspendable
+  public void flush() throws TTransportException {
+    if (curWriteBuffer < 2) {
+      throw new RuntimeException("Attempted to flush with less than two buffers, make sure you " +
+          "are using TFastFramedTransport or TFramedTransport");
+    }
+
+    curWriteBuffer = 0;
+
     try {
-      socketChannel.write(buf);
+      while (writeBuffers[1].hasRemaining()) {
+        long bytesWritten = socketChannel.write(writeBuffers);
+        if (bytesWritten < 0) {
+          throw new TTransportException(TTransportException.END_OF_FILE);
+        }
+      }
     } catch (IOException ioex) {
       throw new TTransportException(TTransportException.UNKNOWN, ioex);
     }
   }
 
+  private int curWriteBuffer;
+  private final ByteBuffer[] writeBuffers;
   private final FiberSocketChannel socketChannel;
+  private final long timeout;
+  private final TimeUnit timeoutUnit;
 
   private static final Logger LOG = LoggerFactory.getLogger(TFiberSocket.class);
 }
