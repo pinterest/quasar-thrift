@@ -26,7 +26,6 @@ if (!project.hasProperty("sonatypeUsername") || !project.hasProperty("sonatypePa
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
 }
 
