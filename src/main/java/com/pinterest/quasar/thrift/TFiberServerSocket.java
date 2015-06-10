@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
+import java.sql.Time;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -43,7 +44,19 @@ public class TFiberServerSocket extends TServerTransport {
    * @throws TTransportException if the server socket cannot be created.
    */
   public TFiberServerSocket(InetSocketAddress addr) throws TTransportException {
+    this(addr, false);
+  }
+
+  /**
+   * Constructor
+   *
+   * @param addr the port to which the server socket will be bound.
+   * @param useFramedFiberSockets true to use TFramedFiberSocket for all incoming connections, false
+   *                              to use TFiberSocket.
+   */
+  public TFiberServerSocket(InetSocketAddress addr, boolean useFramedFiberSockets) {
     this.addr = addr;
+    this.useFramedFiberSockets = useFramedFiberSockets;
   }
 
   /**
@@ -63,6 +76,8 @@ public class TFiberServerSocket extends TServerTransport {
           .bind(addr);
     } catch (IOException ioex) {
       throw new TTransportException(TTransportException.UNKNOWN, ioex);
+    } catch (SuspendExecution seex) {
+      throw new TTransportException(TTransportException.UNKNOWN, seex);
     }
   }
 
@@ -86,6 +101,9 @@ public class TFiberServerSocket extends TServerTransport {
   protected TTransport acceptImpl() throws TTransportException {
     try {
       FiberSocketChannel socketChannel = serverSocketChannel.accept();
+      if (useFramedFiberSockets) {
+        return new TFramedFiberSocket(socketChannel, -1, TimeUnit.SECONDS);
+      }
       return new TFiberSocket(socketChannel, -1, TimeUnit.SECONDS);
     } catch (SuspendExecution ex) {
       throw new AssertionError("Instrumentation should have removed this code");
@@ -96,6 +114,7 @@ public class TFiberServerSocket extends TServerTransport {
 
   private volatile FiberServerSocketChannel serverSocketChannel;
   private final InetSocketAddress addr;
+  private final boolean useFramedFiberSockets;
 
   private static final Logger LOG = LoggerFactory.getLogger(TFiberServerSocket.class);
 }

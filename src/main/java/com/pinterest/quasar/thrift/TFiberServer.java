@@ -118,7 +118,7 @@ public class TFiberServer extends TServer {
    * @param args server arguments, passed to super class, these are only used
    *             for the transport and processor.
    */
-  public TFiberServer(AbstractServerArgs<Args> args) {
+  public TFiberServer(Args args) {
     super(args);
     serverFiber = new AcceptFiber();
     stopped = false;

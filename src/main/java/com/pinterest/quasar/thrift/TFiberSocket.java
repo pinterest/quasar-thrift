@@ -17,6 +17,7 @@ package com.pinterest.quasar.thrift;
 
 import co.paralleluniverse.fibers.SuspendExecution;
 import co.paralleluniverse.fibers.Suspendable;
+import co.paralleluniverse.fibers.io.ChannelGroup;
 import co.paralleluniverse.fibers.io.FiberSocketChannel;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
@@ -26,39 +27,86 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousChannelGroup;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A Thrift socket that uses Fiber-blocking network calls.
+ * A Thrift socket transport that uses Fiber-blocking I/O.
  *
- * This class is thread-safe. TODO(charles): clarify this!
+ * TFiberSocket is a drop-in replacment for TSocket for clients and servers written using Quasar's
+ * Fibers. If you intend to use a framed transport (like TFastFramedTransport, or TFramedTransport)
+ * it is better to use TFramedFiberSocket, as it gives much better performance (and lower memory
+ * usage) than the combination of TFastFramedTransport and TFiberSocket.
+ *
+ * TODO: implement connect timeouts (after upgrading Quasar) and add separate timeouts for read
+ * and write.
  */
 public class TFiberSocket extends TTransport {
   TFiberSocket(FiberSocketChannel fsc, long timeout, TimeUnit timeoutUnit) {
-    curWriteBuffer = 0;
-    writeBuffers = new ByteBuffer[2];
     socketChannel = fsc;
     this.timeout = timeout;
     this.timeoutUnit = timeoutUnit;
   }
 
-  // Quasar cannot instrument constructors, so these need to be static methods.
+  // Quasar cannot instrument constructors, so the following methods need to be static.
+
+  /**
+   * Create a TFiberSocket and connect it to the given address.
+   *
+   * This method has no explicit timeout for the connection, so it will wait for the TCP timeout
+   * which can be quite long (tens of seconds in some cases).
+   *
+   * @param addr the address to connect.
+   * @return a TFiberSocket that is connected to the requested address.
+   * @throws IOException
+   * @throws SuspendExecution
+   */
   public static TFiberSocket open(SocketAddress addr) throws IOException, SuspendExecution {
     return new TFiberSocket(FiberSocketChannel.open(addr), -1, TimeUnit.SECONDS);
   }
 
+  /**
+   * Create a TFiberSocket and connect it to the given address, failing if it takes longer than the
+   * given timeout.
+   *
+   * @param addr the address to connect.
+   * @param timeout the duration of the timeout, in the given units.
+   * @param unit the units of the timeout duration.
+   * @return a TFiberSocket that is connected to the requested address.
+   * @throws IOException
+   * @throws SuspendExecution
+   */
   public static TFiberSocket open(SocketAddress addr, long timeout, TimeUnit unit)
       throws IOException, SuspendExecution {
     return new TFiberSocket(FiberSocketChannel.open(addr), timeout, unit);
   }
 
-  public static TFiberSocket open(SocketAddress addr, AsynchronousChannelGroup group)
+  /**
+   * Create a TFiberSocket and connect it to the given address, using the given channel group.
+   *
+   * @param addr the address to connect.
+   * @param group the channel group to use, see the relevant docs for details.
+   * @return a TFiberSocket that is connected to the requested address.
+   * @throws IOException
+   * @throws SuspendExecution
+   */
+  public static TFiberSocket open(SocketAddress addr, ChannelGroup group)
       throws IOException, SuspendExecution {
     return new TFiberSocket(FiberSocketChannel.open(group, addr), -1, TimeUnit.SECONDS);
   }
 
-  public static TFiberSocket open(SocketAddress addr, AsynchronousChannelGroup group, long timeout, TimeUnit unit)
+  /**
+   * Create a TFiberSocket and connect it to the given address, within the given timeout duration,
+   * using the given channel group.
+   *
+   * @param addr the address to connect.
+   * @param group the channel group to use, see the relevant docs for details.
+   * @param timeout the duration of the timeout, in the given units.
+   * @param unit the units of the timeout duration.
+   * @return a TFiberSocket that is connected to the requested address.
+   * @throws IOException
+   * @throws SuspendExecution
+   */
+  public static TFiberSocket open(SocketAddress addr, ChannelGroup group, long timeout, TimeUnit unit)
       throws IOException, SuspendExecution {
     return new TFiberSocket(FiberSocketChannel.open(group, addr), timeout, unit);
   }
@@ -131,29 +179,11 @@ public class TFiberSocket extends TTransport {
   @Override
   @Suspendable
   public void write(byte[] bytes, int offset, int limit) throws TTransportException {
-    if (curWriteBuffer == 2) {
-      throw new RuntimeException("Attempted to write more than two buffers to TSocket, make sure " +
-          "you are using TFastFramedTransport or TFramedTransport");
-    }
-
-    writeBuffers[curWriteBuffer] = ByteBuffer.wrap(bytes, offset, limit);
-    curWriteBuffer++;
-  }
-
-  @Override
-  @Suspendable
-  public void flush() throws TTransportException {
-    if (curWriteBuffer < 2) {
-      throw new RuntimeException("Attempted to flush with less than two buffers, make sure you " +
-          "are using TFastFramedTransport or TFramedTransport");
-    }
-
-    curWriteBuffer = 0;
-
+    ByteBuffer buf = ByteBuffer.wrap(bytes, offset, limit);
     try {
-      while (writeBuffers[1].hasRemaining()) {
-        long bytesWritten = socketChannel.write(writeBuffers);
-        if (bytesWritten < 0) {
+      while (buf.hasRemaining()) {
+        long bytesWritten = socketChannel.write(buf);
+        if (bytesWritten == 0) {
           throw new TTransportException(TTransportException.END_OF_FILE);
         }
       }
@@ -162,8 +192,14 @@ public class TFiberSocket extends TTransport {
     }
   }
 
-  private int curWriteBuffer;
-  private final ByteBuffer[] writeBuffers;
+  /**
+   * Flushes any buffered data to the underlying socket.
+   * @throws TTransportException
+   */
+  @Override
+  @Suspendable
+  public void flush() throws TTransportException {}
+
   private final FiberSocketChannel socketChannel;
   private final long timeout;
   private final TimeUnit timeoutUnit;

@@ -30,7 +30,7 @@ repositories {
 }
 
 dependencies {
-    compile group: 'co.paralleluniverse', name: 'quasar-core', version: '0.6.0'
+    compile group: 'co.paralleluniverse', name: 'quasar-core', version: '0.7.0'
     compile group: 'org.apache.thrift', name: 'libthrift', version: '0.9.1'
 }
 
