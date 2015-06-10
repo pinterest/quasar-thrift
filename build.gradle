@@ -8,7 +8,7 @@ targetCompatibility = '1.7'
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 
 group                = "com.pinterest"
-version              = "0.1-SNAPSHOT"
+version              = "0.2-SNAPSHOT"
 status               = "integration"
 description          = "Thrift integration with the Quasar libraries"
 ext.url              = "https://github.com/pinterest/quasar-thrift"

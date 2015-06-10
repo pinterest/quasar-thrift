@@ -79,20 +79,29 @@ public class TFramedFiberSocket extends TTransport {
     try {
       header.clear();
       while (header.position() < header.capacity()) {
-        socketChannel.read(header);
+        LOG.info("reading header bytes");
+        long bytesRead = socketChannel.read(header);
+        if (bytesRead == -1) {
+          throw new TTransportException(TTransportException.END_OF_FILE);
+        }
       }
 
       header.flip();
       int len = header.getInt();
 
       if (buffer.capacity() < len) {
+        LOG.info("allocating a new buffer of size {}", len);
         buffer = ByteBuffer.allocate(len);
       } else {
         buffer.clear();
       }
 
       while (buffer.position() < len) {
-        socketChannel.read(buffer, timeout, timeoutUnit);
+        LOG.info("reading body bytes with timeout");
+        long bytesRead = socketChannel.read(buffer, timeout, timeoutUnit);
+        if (bytesRead == -1) {
+          throw new TTransportException(TTransportException.END_OF_FILE);
+        }
       }
 
       buffer.flip();
@@ -111,6 +120,7 @@ public class TFramedFiberSocket extends TTransport {
       state = STATE_READ;
     }
 
+    LOG.info("Returning bytes from buffer");
     buffer.get(bytes, offset, limit);
     return limit;
   }
@@ -131,6 +141,7 @@ public class TFramedFiberSocket extends TTransport {
       buffer = newBuffer;
     }
 
+    LOG.info("writing bytes into buffer");
     buffer.put(bytes, offset, limit);
   }
 
@@ -143,6 +154,7 @@ public class TFramedFiberSocket extends TTransport {
       header.putInt(buffer.remaining()).flip();
       ByteBuffer[] buffers = {header, buffer};
       while (buffer.hasRemaining()) {
+        LOG.info("writing out header and body bytes");
         long bytesWritten = socketChannel.write(buffers);
         if (bytesWritten == 0) {
           throw new TTransportException(TTransportException.END_OF_FILE);
